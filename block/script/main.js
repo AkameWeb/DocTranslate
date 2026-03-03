@@ -325,16 +325,24 @@ window.loadFromHistory = function(id) {
 };
 
 // ==================== Перевод текста (имитация) ====================
-function simulateTranslation(text, from, to) {
-    if (!text.trim()) return '';
-    const mock = {
-        'ru-en': { 'привет': 'hello', 'как дела': 'how are you', 'документ': 'document', 'перевод': 'translation' },
-        'en-ru': { 'hello': 'привет', 'how are you': 'как дела', 'document': 'документ', 'translation': 'перевод' }
-    };
-    const key = `${from}-${to}`;
-    const lower = text.toLowerCase().trim();
-    if (mock[key] && mock[key][lower]) return mock[key][lower];
-    return from === 'ru' ? text + ' [en]' : text + ' [ru]';
+// Функция отправки текста на сервер для перевода
+async function translateText(text, from, to) {
+    try {
+        const response = await fetch('translate-text.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, from, to })
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Ошибка перевода');
+
+        return data.translated;
+    } catch (error) {
+        console.error('Translation error:', error);
+        showToast('Ошибка при переводе: ' + error.message);
+        return null;
+    }
 }
 
 // ==================== Работа с файлами ====================
@@ -476,18 +484,29 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Перевод текста
     if (translateBtn) {
-        translateBtn.addEventListener('click', () => {
-            const text = sourceText.value.trim();
-            if (!text) {
-                showToast('Введите текст для перевода');
-                return;
-            }
-            const result = simulateTranslation(text, currentLangFrom, currentLangTo);
-            translatedText.value = result;
-            addToHistory(text, result, currentLangFrom, currentLangTo, 'text');
+    translateBtn.addEventListener('click', async () => {
+        const text = sourceText.value.trim();
+        if (!text) {
+            showToast('Введите текст для перевода');
+            return;
+        }
+
+        // Показываем индикатор загрузки (можно добавить)
+        translateBtn.disabled = true;
+        translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Перевод...';
+
+        const translated = await translateText(text, currentLangFrom, currentLangTo);
+
+        translateBtn.disabled = false;
+        translateBtn.innerHTML = '<i class="fas fa-magic"></i> Перевести';
+
+        if (translated !== null) {
+            translatedText.value = translated;
+            addToHistory(text, translated, currentLangFrom, currentLangTo, 'text');
             showToast('Перевод выполнен');
-        });
-    }
+        }
+    });
+}
 
     // Загрузка файлов
     if (fileUpload && fileInput) {
