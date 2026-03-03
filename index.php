@@ -1,4 +1,4 @@
-<?php require_once "block/header.php";?>
+<?php require_once "block/header.php"; ?>
 <body>
     <div class="dashboard">
         <!-- Шапка -->
@@ -7,9 +7,10 @@
                 <i class="fas fa-language"></i>
                 DocTranslate
             </div>
-            <div class="user-menu">
-                <span><i class="far fa-user"></i> </span>
-                <div class="avatar"> </div>
+            <div class="user-menu" id="userMenu">
+                <!-- Динамически заполняется через JS -->
+                <span><i class="far fa-user"></i> Гость</span>
+                <div class="avatar" id="avatarBtn"><i class="fas fa-sign-in-alt"></i></div>
             </div>
         </div>
 
@@ -74,15 +75,65 @@
                     <!-- История будет загружаться сюда -->
                 </div>
             </div>
-
-          
         </div>
-         <?php require_once "block/footer.php"?>
-        
+
+        <?php require_once "block/footer.php"; ?>
+    </div>
+
+    <!-- Модальное окно авторизации/регистрации -->
+    <div class="modal" id="authModal">
+        <div class="modal-content">
+            <i class="fas fa-times modal-close" id="closeModal"></i>
+            <div class="modal-tabs">
+                <div class="modal-tab active" id="loginTab">Вход</div>
+                <div class="modal-tab" id="registerTab">Регистрация</div>
+            </div>
+            <!-- Форма входа -->
+            <div class="auth-form" id="loginForm">
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="loginEmail" placeholder="example@mail.com">
+                </div>
+                <div class="form-group">
+                    <label>Пароль</label>
+                    <input type="password" id="loginPassword" placeholder="••••••••">
+                </div>
+                <div class="auth-error" id="loginError"></div>
+                <button class="auth-btn" id="loginBtn">Войти</button>
+                <div class="auth-switch">
+                    Нет аккаунта? <span id="switchToRegister">Зарегистрироваться</span>
+                </div>
+            </div>
+            <!-- Форма регистрации (скрыта по умолчанию) -->
+            <div class="auth-form" id="registerForm" style="display: none;">
+                <div class="form-group">
+                    <label>Имя</label>
+                    <input type="text" id="registerName" placeholder="Иван Иванов">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="registerEmail" placeholder="example@mail.com">
+                </div>
+                <div class="form-group">
+                    <label>Пароль</label>
+                    <input type="password" id="registerPassword" placeholder="••••••••">
+                </div>
+                <div class="form-group">
+                    <label>Подтверждение пароля</label>
+                    <input type="password" id="registerConfirm" placeholder="••••••••">
+                </div>
+                <div class="auth-error" id="registerError"></div>
+                <button class="auth-btn" id="registerBtn">Зарегистрироваться</button>
+                <div class="auth-switch">
+                    Уже есть аккаунт? <span id="switchToLogin">Войти</span>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Уведомление -->
     <div class="toast" id="toast">Скопировано!</div>
-  
+
+   
 </body>
 </html>
