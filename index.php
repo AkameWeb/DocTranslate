@@ -88,6 +88,7 @@
                 <div class="modal-tab active" id="loginTab">Вход</div>
                 <div class="modal-tab" id="registerTab">Регистрация</div>
             </div>
+            
             <!-- Форма входа -->
             <div class="auth-form" id="loginForm">
                 <div class="form-group">
@@ -102,6 +103,11 @@
                 <button class="auth-btn" id="loginBtn">Войти</button>
                 <div class="auth-switch">
                     Нет аккаунта? <span id="switchToRegister">Зарегистрироваться</span>
+                </div>
+                <div class="google-auth">
+                    <a href="google-callback.php" class="google-btn">
+                    <i class="fab fa-google"></i> Войти через Google
+                        </a>
                 </div>
             </div>
             <!-- Форма регистрации (скрыта по умолчанию) -->

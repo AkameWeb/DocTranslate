@@ -22,10 +22,11 @@ class ComposerStaticInit33005827836b7dc632dafd013dfbf380
             'Psr\\Http\\Message\\' => 17,
             'Psr\\Http\\Client\\' => 16,
             'PhpOffice\\PhpWord\\' => 18,
+            'PhpOffice\\Math\\' => 15,
         ),
         'L' =>
         array (
-            'Laminas\\Escaper\\' => 16,
+            'League\\OAuth2\\Client\\' => 21,
         ),
         'G' =>
         array (
@@ -53,9 +54,14 @@ class ComposerStaticInit33005827836b7dc632dafd013dfbf380
         array (
             0 => __DIR__ . '/..' . '/phpoffice/phpword/src/PhpWord',
         ),
-        'Laminas\\Escaper\\' =>
+        'PhpOffice\\Math\\' =>
         array (
-            0 => __DIR__ . '/..' . '/laminas/laminas-escaper/src',
+            0 => __DIR__ . '/..' . '/phpoffice/math/src/Math',
+        ),
+        'League\\OAuth2\\Client\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/league/oauth2-google/src',
+            1 => __DIR__ . '/..' . '/league/oauth2-client/src',
         ),
         'GuzzleHttp\\Psr7\\' =>
         array (
