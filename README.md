@@ -222,7 +222,7 @@ limitations under the License.
 ## 📬 Контакты
 
 - GitHub: [AkameWeb](https://github.com/AkameWeb)
-- Email: *(добавьте свой email)*
+- Email: *mejkrejden@gmail.com*
 
 ---
 
