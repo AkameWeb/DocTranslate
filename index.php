@@ -69,7 +69,7 @@
             <div class="history-panel">
                 <div class="history-header">
                     <h3><i class="fas fa-history"></i> История переводов</h3>
-                    <div class="clear-history" id="clearHistory"><i class="far fa-trash-alt"></i> Очистить</div>
+                    <!-- Кнопки очистки будут добавлены динамически через JS -->
                 </div>
                 <div class="history-list" id="historyList">
                     <!-- История будет загружаться сюда -->
@@ -106,8 +106,8 @@
                 </div>
                 <div class="google-auth">
                     <a href="google-callback.php" class="google-btn">
-                    <i class="fab fa-google"></i> Войти через Google
-                        </a>
+                        <i class="fab fa-google"></i> Войти через Google
+                    </a>
                 </div>
             </div>
             <!-- Форма регистрации (скрыта по умолчанию) -->
@@ -139,7 +139,5 @@
 
     <!-- Уведомление -->
     <div class="toast" id="toast">Скопировано!</div>
-
-   
 </body>
 </html>

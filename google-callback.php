@@ -1,10 +1,21 @@
 <?php
 session_start();
+
+// Включение отображения ошибок (убрать на продакшене)
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 require_once 'vendor/autoload.php';
-require_once 'config/db.php';               // если используете БД
-require_once 'google-config.php';              // ваш файл с $clientID, $clientSecret, $redirectUri
+require_once 'config/db.php';
+require_once 'google-config.php';
 
 use League\OAuth2\Client\Provider\Google;
+
+// Проверка наличия ошибки от Google
+if (isset($_GET['error'])) {
+    die('Ошибка авторизации: ' . htmlspecialchars($_GET['error']));
+}
 
 $provider = new Google([
     'clientId'     => $clientID,
@@ -24,6 +35,14 @@ if (!isset($_GET['code'])) {
 if (empty($_GET['state']) || ($_GET['state'] !== $_SESSION['oauth2state'])) {
     unset($_SESSION['oauth2state']);
     die('Invalid state');
+}
+
+// Очищаем state после успешной проверки
+unset($_SESSION['oauth2state']);
+
+// Проверка подключения к БД
+if (!isset($pdo)) {
+    die('Ошибка подключения к базе данных');
 }
 
 // Получаем токен и данные пользователя
@@ -66,6 +85,7 @@ try {
     $_SESSION['user_name'] = $userName;
     $_SESSION['user_email'] = $email;
 
+    // Редирект на главную
     header('Location: index.php');
     exit;
 
