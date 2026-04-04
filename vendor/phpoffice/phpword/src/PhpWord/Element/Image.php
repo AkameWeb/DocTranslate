@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of PHPWord - A pure PHP library for reading and writing
  * word processing documents.
@@ -54,7 +55,7 @@ class Image extends AbstractElement
     /**
      * Image style.
      *
-     * @var ImageStyle
+     * @var ?ImageStyle
      */
     private $style;
 
@@ -159,7 +160,7 @@ class Image extends AbstractElement
     /**
      * Get Image style.
      *
-     * @return ImageStyle
+     * @return ?ImageStyle
      */
     public function getStyle()
     {
@@ -386,8 +387,9 @@ class Image extends AbstractElement
             $imageBinary = $this->source;
         } else {
             $fileHandle = fopen($actualSource, 'rb', false);
-            if ($fileHandle !== false) {
-                $imageBinary = fread($fileHandle, filesize($actualSource));
+            $fileSize = filesize($actualSource);
+            if ($fileHandle !== false && $fileSize > 0) {
+                $imageBinary = fread($fileHandle, $fileSize);
                 fclose($fileHandle);
             }
         }
@@ -417,10 +419,10 @@ class Image extends AbstractElement
         }
 
         if ($base64) {
-            return chunk_split(base64_encode($imageBinary));
+            return base64_encode($imageBinary);
         }
 
-        return chunk_split(bin2hex($imageBinary));
+        return bin2hex($imageBinary);
     }
 
     /**

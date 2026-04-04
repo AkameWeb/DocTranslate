@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of PHPWord - A pure PHP library for reading and writing
  * word processing documents.
@@ -135,8 +136,11 @@ class Content extends AbstractPart
             $xmlWriter->startElement('text:p');
             $xmlWriter->writeAttribute('text:style-name', 'SB' . $section->getSectionId());
             $xmlWriter->endElement();
+
             $containerWriter = new Container($xmlWriter, $section);
+            $containerWriter->setPart($this);
             $containerWriter->write();
+
             $xmlWriter->endElement(); // text:section
         }
 
@@ -198,7 +202,7 @@ class Content extends AbstractPart
         }
 
         foreach ($styles as $style) {
-            $sty = $style->getStyleName();
+            $sty = (string) $style->getStyleName();
             if (substr($sty, 0, 8) === 'Heading_') {
                 $style = new Paragraph();
                 $style->setStyleName('HD' . substr($sty, 8));
@@ -227,7 +231,7 @@ class Content extends AbstractPart
             }
         }
         foreach ($this->imageParagraphStyles as $style) {
-            $styleWriter = new \PhpOffice\PhpWord\Writer\ODText\Style\Paragraph($xmlWriter, $style);
+            $styleWriter = new ParagraphStyleWriter($xmlWriter, $style);
             $styleWriter->write();
         }
     }
@@ -253,7 +257,7 @@ class Content extends AbstractPart
      *
      * Table style can be null or string of the style name
      *
-     * @param \PhpOffice\PhpWord\Element\AbstractContainer $container
+     * @param AbstractContainer $container
      * @param int $paragraphStyleCount
      * @param int $fontStyleCount
      *
@@ -274,13 +278,12 @@ class Content extends AbstractPart
                 $style = $element->getStyle();
                 $style->setStyleName('fr' . $element->getMediaIndex());
                 $this->autoStyles['Image'][] = $style;
-                $sty = new \PhpOffice\PhpWord\Style\Paragraph();
+                $sty = new Paragraph();
                 $sty->setStyleName('IM' . $element->getMediaIndex());
                 $sty->setAuto();
                 $sty->setAlignment($style->getAlignment());
                 $this->imageParagraphStyles[] = $sty;
             } elseif ($element instanceof Table) {
-                /** @var \PhpOffice\PhpWord\Style\Table $style */
                 $style = $element->getStyle();
                 if (is_string($style)) {
                     $style = Style::getStyle($style);
@@ -298,7 +301,7 @@ class Content extends AbstractPart
     /**
      * Get style of individual element.
      *
-     * @param \PhpOffice\PhpWord\Element\Text $element
+     * @param Text $element
      * @param int $paragraphStyleCount
      * @param int $fontStyleCount
      */
@@ -344,7 +347,7 @@ class Content extends AbstractPart
     /**
      * Get font style of individual field element.
      *
-     * @param \PhpOffice\PhpWord\Element\Field $element
+     * @param Field $element
      * @param int $fontStyleCount
      */
     private function getElementStyleField($element, &$fontStyleCount): void
@@ -369,7 +372,7 @@ class Content extends AbstractPart
     /**
      * Get style of individual element.
      *
-     * @param \PhpOffice\PhpWord\Element\TextRun $element
+     * @param TextRun $element
      * @param int $paragraphStyleCount
      */
     private function getElementStyleTextRun($element, &$paragraphStyleCount): void

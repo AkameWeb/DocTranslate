@@ -3,6 +3,7 @@ require_once __DIR__ . '/vendor/autoload.php';
 
 use PhpOffice\PhpWord\IOFactory;
 use Stichoza\GoogleTranslate\GoogleTranslate;
+use Smalot\PdfParser\Parser;
 
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST');
@@ -25,8 +26,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['file'])) {
 
     // Проверка расширения
     $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-    if (!in_array($ext, ['doc', 'docx'])) {
-        $response['error'] = 'Поддерживаются только файлы DOC и DOCX';
+    if (!in_array($ext, ['doc', 'docx', 'pdf'])) {
+        $response['error'] = 'Поддерживаются только DOC, DOCX и PDF';
         echo json_encode($response);
         exit;
     }
@@ -44,45 +45,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['file'])) {
     }
 
     try {
-        // Загружаем документ через PHPWord
-        $phpWord = IOFactory::load($tmpPath);
         $text = '';
 
-        // Обход всех секций документа
-        foreach ($phpWord->getSections() as $section) {
-            foreach ($section->getElements() as $element) {
-                // Простые текстовые элементы
-                if (method_exists($element, 'getText')) {
-                    $text .= $element->getText() . ' ';
-                }
-                // Элементы TextRun (содержат несколько кусков текста)
-                elseif ($element instanceof \PhpOffice\PhpWord\Element\TextRun) {
-                    foreach ($element->getElements() as $child) {
-                        if (method_exists($child, 'getText')) {
-                            $text .= $child->getText() . ' ';
+        if ($ext === 'pdf') {
+            // Обработка PDF
+            $parser = new Parser();
+            $pdf = $parser->parseFile($tmpPath);
+            $text = $pdf->getText();
+        } else {
+            // Обработка DOC/DOCX
+            $phpWord = IOFactory::load($tmpPath);
+            foreach ($phpWord->getSections() as $section) {
+                foreach ($section->getElements() as $element) {
+                    if (method_exists($element, 'getText')) {
+                        $text .= $element->getText() . ' ';
+                    } elseif ($element instanceof \PhpOffice\PhpWord\Element\TextRun) {
+                        foreach ($element->getElements() as $child) {
+                            if (method_exists($child, 'getText')) {
+                                $text .= $child->getText() . ' ';
+                            }
                         }
                     }
                 }
-                // Для таблиц можно добавить обход, но пока ограничимся текстом
             }
-        }
-
-        // Если текст не найден, пробуем альтернативный метод (для .doc)
-        if (empty(trim($text)) && $ext === 'doc') {
-            // Метод getPlainText() может сработать для простых документов
-            $text = $phpWord->getPlainText() ?: $text;
         }
 
         // Удаляем временный файл
         unlink($tmpPath);
 
         if (empty(trim($text))) {
-            $response['error'] = 'Не удалось извлечь текст из документа (возможно, файл пуст или имеет сложное форматирование)';
+            $response['error'] = 'Не удалось извлечь текст из документа';
             echo json_encode($response);
             exit;
         }
 
-        // Перевод текста
+        // Перевод
         $tr = new GoogleTranslate();
         $tr->setSource($sourceLang)->setTarget($targetLang);
         $translated = $tr->translate($text);
