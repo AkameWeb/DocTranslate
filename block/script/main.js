@@ -1,14 +1,14 @@
 // ==================== Глобальные переменные ====================
-let currentLangFrom = 'ru';
-let currentLangTo = 'en';
-let history = [];                      // будет загружаться с сервера
-let currentUser = null;                // данные авторизованного пользователя
+let appHistory = [];          // переименовано, чтобы избежать конфликта с window.history
+let currentUser = null;
+let sourceLangSelect = null;
+let targetLangSelect = null;
 
-// DOM-элементы (заполнятся позже)
-let langBtns, swapBtn, sourceText, translatedText, translateBtn,
-    fileUpload, fileInput, historyList, clearHistoryBtn, toast, userMenu,
-    modal, closeModal, loginTab, registerTab, loginForm, registerForm,
-    switchToRegister, switchToLogin, loginBtn, registerBtn, loginError, registerError;
+// DOM-элементы
+let swapBtn, sourceText, translatedText, translateBtn, fileUpload, fileInput,
+    historyList, toast, userMenu, modal, closeModal, loginTab, registerTab,
+    loginForm, registerForm, switchToRegister, switchToLogin, loginBtn,
+    registerBtn, loginError, registerError;
 
 // ==================== Вспомогательные функции ====================
 
@@ -19,7 +19,6 @@ function showToast(message) {
     setTimeout(() => toast.classList.remove('show'), 2000);
 }
 
-// Копирование текста (глобальная для onclick)
 window.copyText = function(elementId) {
     const textarea = document.getElementById(elementId);
     if (textarea && textarea.value) {
@@ -27,37 +26,20 @@ window.copyText = function(elementId) {
     }
 };
 
-// Поворот стрелки в зависимости от активного языка
-function updateSwitchIcon() {
-    const ruBtn = document.querySelector('[data-lang="ru"]');
-    if (!swapBtn) swapBtn = document.getElementById('swapLanguages');
-    if (ruBtn && swapBtn) {
-        ruBtn.classList.contains('active')
-            ? swapBtn.classList.remove('rotated')
-            : swapBtn.classList.add('rotated');
-    }
-}
+// ==================== Работа с пользователем ====================
 
-// ==================== Работа с пользователем (сессии) ====================
-
-// Проверка текущей сессии при загрузке
 async function checkSession() {
     try {
         const res = await fetch('check-session.php');
         const data = await res.json();
-        if (data.loggedIn) {
-            currentUser = data.user;
-        } else {
-            currentUser = null;
-        }
+        currentUser = data.loggedIn ? data.user : null;
     } catch (e) {
-        console.error('Session check failed', e);
         currentUser = null;
     }
     renderUserMenu();
+    renderHistoryActions();
 }
 
-// Рендер шапки в зависимости от статуса
 function renderUserMenu() {
     if (!userMenu) userMenu = document.getElementById('userMenu');
     if (!userMenu) return;
@@ -69,40 +51,37 @@ function renderUserMenu() {
             <div class="avatar" id="avatarBtn">${initials}</div>
             <i class="fas fa-sign-out-alt" id="logoutBtn" style="color: #64748b; cursor: pointer;" title="Выйти"></i>
         `;
-        document.getElementById('logoutBtn').addEventListener('click', logout);
+        document.getElementById('logoutBtn')?.addEventListener('click', logout);
     } else {
         userMenu.innerHTML = `
             <span><i class="far fa-user"></i> Гость</span>
             <div class="avatar" id="avatarBtn"><i class="fas fa-sign-in-alt"></i></div>
         `;
     }
-    document.getElementById('avatarBtn').addEventListener('click', () => {
+    document.getElementById('avatarBtn')?.addEventListener('click', () => {
         if (!currentUser) openModal();
     });
 }
 
-// Выход
 async function logout() {
     try {
         await fetch('logout.php');
         currentUser = null;
         renderUserMenu();
+        renderHistoryActions();
+        loadGuestHistory();
         showToast('Вы вышли из аккаунта');
-        // Очистить локальную историю, если нужно (но можно оставить, как есть)
-        history = [];
-        renderHistory();
     } catch (e) {
         console.error('Logout error', e);
     }
 }
 
-// ==================== Модальное окно авторизации ====================
+// ==================== Модальное окно ====================
 
 function openModal() {
     if (!modal) modal = document.getElementById('authModal');
     if (!modal) return;
     modal.classList.add('active');
-    // Очистка полей и ошибок
     if (loginError) loginError.textContent = '';
     if (registerError) registerError.textContent = '';
     ['loginEmail','loginPassword','registerName','registerEmail','registerPassword','registerConfirm']
@@ -132,9 +111,8 @@ function showRegister() {
     loginForm.style.display = 'none';
 }
 
-// ==================== Запросы к API авторизации ====================
+// ==================== Авторизация ====================
 
-// Обычная регистрация
 async function handleRegister() {
     const name = document.getElementById('registerName')?.value.trim();
     const email = document.getElementById('registerEmail')?.value.trim();
@@ -160,8 +138,10 @@ async function handleRegister() {
         if (res.ok && data.success) {
             currentUser = data.user;
             renderUserMenu();
+            renderHistoryActions();
             closeModalFunc();
             showToast(`Добро пожаловать, ${data.user.name}!`);
+            loadHistoryFromServer();
         } else {
             registerError.textContent = data.error || 'Ошибка регистрации';
         }
@@ -170,7 +150,6 @@ async function handleRegister() {
     }
 }
 
-// Обычный вход
 async function handleLogin() {
     const email = document.getElementById('loginEmail')?.value.trim();
     const password = document.getElementById('loginPassword')?.value.trim();
@@ -188,9 +167,9 @@ async function handleLogin() {
         if (res.ok && data.success) {
             currentUser = data.user;
             renderUserMenu();
+            renderHistoryActions();
             closeModalFunc();
             showToast(`С возвращением, ${data.user.name}!`);
-            // Загружаем историю пользователя
             loadHistoryFromServer();
         } else {
             loginError.textContent = data.error || 'Неверный email или пароль';
@@ -200,81 +179,184 @@ async function handleLogin() {
     }
 }
 
-// ==================== Работа с историей переводов ====================
+// ==================== История переводов ====================
 
-// Загрузка истории с сервера
 async function loadHistoryFromServer() {
     if (!currentUser) {
-        history = [];
-        renderHistory();
+        loadGuestHistory();
         return;
     }
     try {
         const res = await fetch('get-history.php');
         const data = await res.json();
-        history = data; // сервер уже возвращает готовые для отображения объекты
+        appHistory = data;
     } catch (e) {
-        console.error('Failed to load history', e);
-        history = [];
+        appHistory = [];
     }
     renderHistory();
 }
 
-// Сохранение перевода на сервер
+function loadGuestHistory() {
+    const saved = localStorage.getItem('guestHistory');
+    appHistory = saved ? JSON.parse(saved) : [];
+    renderHistory();
+}
+
+function saveGuestHistory() {
+    localStorage.setItem('guestHistory', JSON.stringify(appHistory));
+}
+
 async function saveTranslationToServer(source, translated, from, to, type) {
-    if (!currentUser) return; // не сохраняем для гостей
+    if (!currentUser) return;
     try {
         await fetch('save-translation.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ source, translated, from, to, type })
         });
-        // После сохранения можно обновить историю (но не обязательно сразу)
         loadHistoryFromServer();
     } catch (e) {
         console.error('Failed to save translation', e);
     }
 }
 
-// Добавление в локальную историю и сохранение на сервер (если авторизован)
+function getLanguageName(code) {
+    const names = {
+        'ru': 'Русский', 'en': 'English', 'de': 'Deutsch', 'fr': 'Français',
+        'es': 'Español', 'it': 'Italiano', 'zh': '中文', 'ja': '日本語',
+        'ko': '한국어', 'ar': 'العربية', 'tr': 'Türkçe', 'pl': 'Polski',
+        'uk': 'Українська', 'pt': 'Português', 'nl': 'Nederlands',
+        'sv': 'Svenska', 'da': 'Dansk', 'fi': 'Suomi', 'no': 'Norsk',
+        'cs': 'Čeština', 'sk': 'Slovenčina', 'hu': 'Magyar', 'el': 'Ελληνικά',
+        'he': 'עברית', 'th': 'ไทย', 'vi': 'Tiếng Việt', 'hi': 'हिन्दी',
+        'bn': 'বাংলা', 'id': 'Bahasa Indonesia', 'ms': 'Bahasa Melayu', 'tl': 'Filipino'
+    };
+    return names[code] || code;
+}
+
 function addToHistory(source, translated, from, to, type = 'text') {
     const fullSource = source;
     const fullTranslated = translated;
-    const fromLang = from === 'ru' ? 'ru' : 'en';
-    const toLang = to === 'ru' ? 'ru' : 'en';
+    const fromLang = from;
+    const toLang = to;
 
-    // Для гостей просто добавляем в локальный массив (без сохранения)
     if (!currentUser) {
         const now = new Date();
         const formattedDate = now.toLocaleString('ru-RU', {
             day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
         });
         const newItem = {
-            id: Date.now().toString(),
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
             source: source.substring(0, 100) + (source.length > 100 ? '...' : ''),
             translated: translated.substring(0, 100) + (translated.length > 100 ? '...' : ''),
             fullSource,
             fullTranslated,
-            from: from === 'ru' ? 'Русский' : 'English',
-            to: to === 'ru' ? 'Русский' : 'English',
+            from: getLanguageName(from),
+            to: getLanguageName(to),
             date: formattedDate,
             type
         };
-        history.unshift(newItem);
-        if (history.length > 20) history.pop();
+        appHistory.unshift(newItem);
+        if (appHistory.length > 20) appHistory.pop();
+        saveGuestHistory();
         renderHistory();
     } else {
-        // Сохраняем на сервер
         saveTranslationToServer(fullSource, fullTranslated, fromLang, toLang, type);
     }
 }
 
-// Рендер истории (из глобального массива history)
+async function deleteHistoryItem(id) {
+    if (!confirm('Удалить эту запись из истории?')) return;
+
+    if (currentUser) {
+        try {
+            const res = await fetch('delete-translation.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: id })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                appHistory = appHistory.filter(item => item.id != id);
+                renderHistory();
+                showToast('Запись удалена');
+            } else {
+                showToast('Ошибка: ' + (data.error || 'Не удалось удалить'));
+            }
+        } catch (e) {
+            showToast('Ошибка соединения');
+        }
+    } else {
+        const index = appHistory.findIndex(item => item.id == id);
+        if (index !== -1) {
+            appHistory.splice(index, 1);
+            saveGuestHistory();
+            renderHistory();
+            showToast('Запись удалена');
+        }
+    }
+}
+
+async function clearMyHistory() {
+    if (!confirm('Вы уверены, что хотите очистить всю свою историю?')) return;
+
+    try {
+        const res = await fetch('clear-my-history.php');
+        const data = await res.json();
+        if (res.ok && data.success) {
+            appHistory = [];
+            renderHistory();
+            showToast('Ваша история очищена');
+        } else {
+            showToast('Ошибка: ' + (data.error || 'Не удалось очистить'));
+        }
+    } catch (e) {
+        showToast('Ошибка соединения');
+    }
+}
+
+function clearGuestHistory() {
+    if (confirm('Очистить всю историю переводов?')) {
+        appHistory = [];
+        saveGuestHistory();
+        renderHistory();
+        showToast('История очищена');
+    }
+}
+
+function renderHistoryActions() {
+    const header = document.querySelector('.history-header');
+    if (!header) return;
+
+    let actionsHtml = '';
+    if (currentUser) {
+        actionsHtml = `<button class="clear-my-history" id="clearMyHistoryBtn"><i class="far fa-trash-alt"></i> Очистить мою</button>`;
+    } else {
+        actionsHtml = `<button class="clear-history" id="clearGuestHistoryBtn"><i class="far fa-trash-alt"></i> Очистить</button>`;
+    }
+
+    let actionsDiv = header.querySelector('.history-actions');
+    if (!actionsDiv) {
+        actionsDiv = document.createElement('div');
+        actionsDiv.className = 'history-actions';
+        header.appendChild(actionsDiv);
+    }
+    actionsDiv.innerHTML = actionsHtml;
+
+    if (currentUser) {
+        const btn = document.getElementById('clearMyHistoryBtn');
+        if (btn) btn.addEventListener('click', clearMyHistory);
+    } else {
+        const btn = document.getElementById('clearGuestHistoryBtn');
+        if (btn) btn.addEventListener('click', clearGuestHistory);
+    }
+}
+
 function renderHistory() {
     if (!historyList) historyList = document.getElementById('historyList');
     if (!historyList) return;
 
-    if (history.length === 0) {
+    if (appHistory.length === 0) {
         historyList.innerHTML = `
             <div style="text-align: center; color: #94a3b8; padding: 40px 20px;">
                 <i class="fas fa-history" style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;"></i>
@@ -284,57 +366,77 @@ function renderHistory() {
         return;
     }
 
-    historyList.innerHTML = history.map(item => `
-        <div class="history-item" data-id="${item.id}" onclick="loadFromHistory('${item.id}')">
-            <div class="history-item-header">
-                <span class="history-lang">${item.from} → ${item.to}</span>
-                <span class="history-date"><i class="far fa-clock"></i> ${item.date}</span>
+    historyList.innerHTML = appHistory.map(item => {
+        const itemId = item.id || `temp_${Date.now()}_${Math.random()}`;
+        return `
+            <div class="history-item" data-id="${itemId}">
+                <div class="history-item-header">
+                    <span class="history-lang">${item.from} → ${item.to}</span>
+                    <span class="history-date"><i class="far fa-clock"></i> ${item.date}</span>
+                </div>
+                <div class="history-preview" onclick="loadFromHistory('${itemId}')">${item.source}</div>
+                <div class="history-type">
+                    <i class="fas ${item.type === 'doc' ? 'fa-file-word' : 'fa-font'}"></i>
+                    ${item.type === 'doc' ? 'Документ' : 'Текст'}
+                </div>
+                <button class="delete-history-item" data-id="${itemId}" title="Удалить запись"><i class="fas fa-trash-alt"></i></button>
             </div>
-            <div class="history-preview">${item.source}</div>
-            <div class="history-type">
-                <i class="fas ${item.type === 'doc' ? 'fa-file-word' : 'fa-font'}"></i>
-                ${item.type === 'doc' ? 'Документ' : 'Текст'}
-            </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
+
+    document.querySelectorAll('.delete-history-item').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteHistoryItem(btn.dataset.id);
+        });
+    });
 }
 
-// Загрузка перевода из истории (глобальная для onclick)
 window.loadFromHistory = function(id) {
-    const item = history.find(h => h.id == id);
+    const item = appHistory.find(h => h.id == id);
     if (!item) return;
 
-    sourceText.value = item.fullSource || item.source; // если fullSource есть, используем его
+    sourceText.value = item.fullSource || item.source;
     translatedText.value = item.fullTranslated || item.translated;
 
-    // Устанавливаем языки
-    document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
-    if (item.from === 'Русский') {
-        document.querySelector('[data-lang="ru"]').classList.add('active');
-        document.querySelector('[data-lang="en"]').classList.remove('active');
-        currentLangFrom = 'ru';
-        currentLangTo = 'en';
-    } else {
-        document.querySelector('[data-lang="en"]').classList.add('active');
-        document.querySelector('[data-lang="ru"]').classList.remove('active');
-        currentLangFrom = 'en';
-        currentLangTo = 'ru';
-    }
-    updateSwitchIcon();
+    const langMap = {
+        'Русский': 'ru', 'English': 'en', 'Deutsch': 'de', 'Français': 'fr',
+        'Español': 'es', 'Italiano': 'it', '中文': 'zh', '日本語': 'ja',
+        '한국어': 'ko', 'العربية': 'ar', 'Türkçe': 'tr', 'Polski': 'pl',
+        'Українська': 'uk', 'Português': 'pt', 'Nederlands': 'nl', 'Svenska': 'sv',
+        'Dansk': 'da', 'Suomi': 'fi', 'Norsk': 'no', 'Čeština': 'cs',
+        'Slovenčina': 'sk', 'Magyar': 'hu', 'Ελληνικά': 'el', 'עברית': 'he',
+        'ไทย': 'th', 'Tiếng Việt': 'vi', 'हिन्दी': 'hi', 'বাংলা': 'bn',
+        'Bahasa Indonesia': 'id', 'Bahasa Melayu': 'ms', 'Filipino': 'tl'
+    };
+
+    const fromCode = langMap[item.from] || 'ru';
+    const toCode = langMap[item.to] || 'en';
+
+    if (sourceLangSelect) sourceLangSelect.value = fromCode;
+    if (targetLangSelect) targetLangSelect.value = toCode;
+
     showToast('Загружено из истории');
 };
 
-// ==================== Перевод текста (имитация) ====================
-function simulateTranslation(text, from, to) {
-    if (!text.trim()) return '';
-    const mock = {
-        'ru-en': { 'привет': 'hello', 'как дела': 'how are you', 'документ': 'document', 'перевод': 'translation' },
-        'en-ru': { 'hello': 'привет', 'how are you': 'как дела', 'document': 'документ', 'translation': 'перевод' }
-    };
-    const key = `${from}-${to}`;
-    const lower = text.toLowerCase().trim();
-    if (mock[key] && mock[key][lower]) return mock[key][lower];
-    return from === 'ru' ? text + ' [en]' : text + ' [ru]';
+// ==================== Перевод текста ====================
+async function translateText(text, from, to) {
+    try {
+        const response = await fetch('translate-text.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, from, to })
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Ошибка перевода');
+
+        return data.translated;
+    } catch (error) {
+        console.error('Translation error:', error);
+        showToast('Ошибка при переводе: ' + error.message);
+        return null;
+    }
 }
 
 // ==================== Работа с файлами ====================
@@ -369,37 +471,58 @@ function uploadAndTranslate(file, from, to) {
 
 function handleFile(file) {
     const name = file.name.toLowerCase();
-    if (!name.endsWith('.docx') && !name.endsWith('.doc')) {
-        showToast('Пожалуйста, загрузите DOC или DOCX файл');
+    const allowed = ['.docx', '.doc', '.pdf'];
+    const hasAllowed = allowed.some(ext => name.endsWith(ext));
+    
+    if (!hasAllowed) {
+        showToast('Пожалуйста, загрузите DOC, DOCX или PDF файл');
         return;
     }
     if (name.endsWith('.doc')) {
         showToast('Загружен старый формат .doc. Извлечение может работать нестабильно...');
+    } else if (name.endsWith('.pdf')) {
+        showToast('Загружен PDF файл. Извлечение текста...');
     } else {
         showToast(`Файл "${file.name}" загружается...`);
     }
-    uploadAndTranslate(file, currentLangFrom, currentLangTo);
+    uploadAndTranslate(file, sourceLangSelect.value, targetLangSelect.value);
 }
 
-// ==================== Очистка локальной истории (только для гостей) ====================
-function clearLocalHistory() {
-    if (currentUser) {
-        // Для авторизованных пользователей очистка истории через сервер?
-        // Можно реализовать отдельный endpoint.
-        showToast('Для авторизованных пользователей очистка временно недоступна');
-        return;
-    }
-    if (confirm('Очистить всю историю переводов?')) {
-        history = [];
-        renderHistory();
-        showToast('История очищена');
-    }
+// ==================== Экспорт в PDF/DOCX ====================
+function downloadFile(url, text) {
+    const formData = new FormData();
+    formData.append('text', text);
+
+    fetch(url, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Ошибка генерации файла');
+        return response.blob();
+    })
+    .then(blob => {
+        const link = document.createElement('a');
+        const fileUrl = URL.createObjectURL(blob);
+        link.href = fileUrl;
+        const extension = url.includes('pdf') ? 'pdf' : 'docx';
+        link.download = `translation.${extension}`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(fileUrl);
+    })
+    .catch(err => {
+        console.error(err);
+        showToast('Ошибка: ' + err.message);
+    });
 }
 
-// ==================== Инициализация при загрузке страницы ====================
+// ==================== Инициализация ====================
 document.addEventListener('DOMContentLoaded', async function() {
-    // Получаем все элементы
-    langBtns = document.querySelectorAll('.lang-btn');
+    // Получаем элементы
+    sourceLangSelect = document.getElementById('sourceLang');
+    targetLangSelect = document.getElementById('targetLang');
     swapBtn = document.getElementById('swapLanguages');
     sourceText = document.getElementById('sourceText');
     translatedText = document.getElementById('translatedText');
@@ -407,7 +530,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     fileUpload = document.getElementById('fileUpload');
     fileInput = document.getElementById('fileInput');
     historyList = document.getElementById('historyList');
-    clearHistoryBtn = document.getElementById('clearHistory');
     toast = document.getElementById('toast');
     userMenu = document.getElementById('userMenu');
     modal = document.getElementById('authModal');
@@ -428,9 +550,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     if (currentUser) {
         await loadHistoryFromServer();
     } else {
-        // Для гостей можно загрузить историю из localStorage (если хотите)
-        // history = JSON.parse(localStorage.getItem('translateHistory')) || [];
-        renderHistory();
+        loadGuestHistory();
     }
 
     // Обработчики модального окна
@@ -443,49 +563,109 @@ document.addEventListener('DOMContentLoaded', async function() {
     if (loginBtn) loginBtn.addEventListener('click', handleLogin);
     if (registerBtn) registerBtn.addEventListener('click', handleRegister);
 
-    // Кнопка Google OAuth (если есть) – просто ссылка
-    // Можно добавить обработчик, но это обычная ссылка на google-callback.php
-
-    // Переключение языков (кнопки)
-    langBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            if (btn.classList.contains('active')) return;
-            langBtns.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            currentLangFrom = btn.dataset.lang === 'ru' ? 'ru' : 'en';
-            currentLangTo = btn.dataset.lang === 'ru' ? 'en' : 'ru';
-            updateSwitchIcon();
-        });
-    });
-
     // Смена языков по стрелке
     if (swapBtn) {
-        swapBtn.addEventListener('click', () => {
-            const ruBtn = document.querySelector('[data-lang="ru"]');
-            const enBtn = document.querySelector('[data-lang="en"]');
-            ruBtn.classList.toggle('active');
-            enBtn.classList.toggle('active');
-            const temp = sourceText.value;
-            sourceText.value = translatedText.value;
-            translatedText.value = temp;
-            currentLangFrom = ruBtn.classList.contains('active') ? 'ru' : 'en';
-            currentLangTo = ruBtn.classList.contains('active') ? 'en' : 'ru';
-            updateSwitchIcon();
-        });
+    swapBtn.addEventListener('click', () => {
+        const tempValue = sourceLangSelect.value;
+        sourceLangSelect.value = targetLangSelect.value;
+        targetLangSelect.value = tempValue;
+        // принудительная перерисовка
+        void swapBtn.offsetWidth;
+        swapBtn.classList.add('rotated');
+        setTimeout(() => swapBtn.classList.remove('rotated'), 300);
+    });
     }
 
     // Перевод текста
     if (translateBtn) {
-        translateBtn.addEventListener('click', () => {
+        translateBtn.addEventListener('click', async () => {
             const text = sourceText.value.trim();
             if (!text) {
                 showToast('Введите текст для перевода');
                 return;
             }
-            const result = simulateTranslation(text, currentLangFrom, currentLangTo);
-            translatedText.value = result;
-            addToHistory(text, result, currentLangFrom, currentLangTo, 'text');
-            showToast('Перевод выполнен');
+
+            translateBtn.disabled = true;
+            translateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Перевод...';
+
+            const translated = await translateText(text, sourceLangSelect.value, targetLangSelect.value);
+
+            translateBtn.disabled = false;
+            translateBtn.innerHTML = '<i class="fas fa-magic"></i> Перевести';
+
+            if (translated !== null) {
+                translatedText.value = translated;
+                addToHistory(text, translated, sourceLangSelect.value, targetLangSelect.value, 'text');
+                showToast('Перевод выполнен');
+            }
+        });
+    }
+
+    // ==================== Перевод изображений ====================
+    function uploadAndTranslateImage(file, from, to) {
+        const formData = new FormData();
+        formData.append('image', file);
+        formData.append('from', from);
+        formData.append('to', to);
+
+        showToast('Распознавание и перевод изображения...');
+
+        fetch('translate-image.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                sourceText.value = data.original;
+                translatedText.value = data.translated;
+                addToHistory(data.original, data.translated, from, to, 'image');
+                showToast('Перевод изображения выполнен');
+            } else {
+                showToast('Ошибка: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('Ошибка соединения с сервером');
+        });
+    }
+
+    function handleImage(file) {
+        const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/bmp'];
+        if (!allowed.includes(file.type)) {
+            showToast('Пожалуйста, загрузите изображение в формате JPEG, PNG, GIF или BMP');
+            return;
+        }
+        showToast(`Изображение "${file.name}" загружается...`);
+        uploadAndTranslateImage(file, sourceLangSelect.value, targetLangSelect.value);
+    }
+
+    // В DOMContentLoaded добавьте обработчики для новой области загрузки
+    const imageUpload = document.getElementById('imageUpload');
+    const imageInput = document.getElementById('imageInput');
+
+    if (imageUpload && imageInput) {
+        imageUpload.addEventListener('click', () => imageInput.click());
+        imageUpload.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            imageUpload.style.borderColor = '#667eea';
+            imageUpload.style.background = '#eef2ff';
+        });
+        imageUpload.addEventListener('dragleave', () => {
+            imageUpload.style.borderColor = '#cbd5e1';
+            imageUpload.style.background = '#f1f5f9';
+        });
+        imageUpload.addEventListener('drop', (e) => {
+            e.preventDefault();
+            imageUpload.style.borderColor = '#cbd5e1';
+            imageUpload.style.background = '#f1f5f9';
+            const file = e.dataTransfer.files[0];
+            if (file) handleImage(file);
+        });
+        imageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) handleImage(file);
         });
     }
 
@@ -514,10 +694,36 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
     }
 
-    // Очистка истории
-    if (clearHistoryBtn) {
-        clearHistoryBtn.addEventListener('click', clearLocalHistory);
+    // Кнопки экспорта
+    const exportPdfBtn = document.getElementById('exportPdfBtn');
+    const exportDocxBtn = document.getElementById('exportDocxBtn');
+    if (exportPdfBtn) {
+        exportPdfBtn.addEventListener('click', () => {
+            const text = translatedText.value.trim();
+            if (!text) {
+                showToast('Нет текста для сохранения');
+                return;
+            }
+            downloadFile('generate-pdf.php', text);
+        });
+    }
+    if (exportDocxBtn) {
+        exportDocxBtn.addEventListener('click', () => {
+            const text = translatedText.value.trim();
+            if (!text) {
+                showToast('Нет текста для сохранения');
+                return;
+            }
+            downloadFile('generate-docx.php', text);
+        });
     }
 
-    updateSwitchIcon(); // начальное положение стрелки
+    // Очистка поля перевода при удалении исходного текста
+    if (sourceText) {
+        sourceText.addEventListener('input', function() {
+            if (this.value.trim() === '') {
+                translatedText.value = '';
+            }
+        });
+    }
 });
