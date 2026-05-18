@@ -21,6 +21,7 @@ return array(
     'PhpOffice\\Math\\' => array($vendorDir . '/phpoffice/math/src/Math'),
     'Masterminds\\' => array($vendorDir . '/masterminds/html5/src'),
     'League\\OAuth2\\Client\\' => array($vendorDir . '/league/oauth2-google/src', $vendorDir . '/league/oauth2-client/src'),
+    'Intervention\\Image\\' => array($vendorDir . '/intervention/image/src/Intervention/Image'),
     'GuzzleHttp\\Psr7\\' => array($vendorDir . '/guzzlehttp/psr7/src'),
     'GuzzleHttp\\Promise\\' => array($vendorDir . '/guzzlehttp/promises/src'),
     'GuzzleHttp\\' => array($vendorDir . '/guzzlehttp/guzzle/src'),

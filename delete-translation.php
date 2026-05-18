@@ -1,38 +1,33 @@
 <?php
 session_start();
-require_once 'config/db.php';
+require_once 'config/database.php';
 
 header('Content-Type: application/json');
 
-// Проверка авторизации
 if (!isset($_SESSION['user_id'])) {
-    http_response_code(401);
     echo json_encode(['error' => 'Не авторизован']);
     exit;
 }
 
-$userId = $_SESSION['user_id'];
 $input = json_decode(file_get_contents('php://input'), true);
-$translationId = $input['id'] ?? 0;
+$id = (int)($input['id'] ?? 0);
+$userId = (int)$_SESSION['user_id'];
 
-if (!$translationId) {
-    http_response_code(400);
-    echo json_encode(['error' => 'Не указан ID перевода']);
+if (!$id) {
+    echo json_encode(['error' => 'Не указан ID']);
     exit;
 }
 
 try {
-    // Удаляем только запись, принадлежащую текущему пользователю
+    // Удаляем запись, если она существует
     $stmt = $pdo->prepare("DELETE FROM translations WHERE id = ? AND user_id = ?");
-    $stmt->execute([$translationId, $userId]);
+    $stmt->execute([$id, $userId]);
     
-    if ($stmt->rowCount() > 0) {
-        echo json_encode(['success' => true]);
-    } else {
-        http_response_code(404);
-        echo json_encode(['error' => 'Запись не найдена или не принадлежит вам']);
-    }
-} catch (PDOException $e) {
-    http_response_code(500);
-    echo json_encode(['error' => 'Ошибка базы данных']);
+    // Очищаем кэш (если используется)
+    $cacheFile = __DIR__ . '/storage/cache/history_translations_' . $userId . '.cache';
+    if (file_exists($cacheFile)) unlink($cacheFile);
+    
+    echo json_encode(['success' => true]);
+} catch (Exception $e) {
+    echo json_encode(['error' => $e->getMessage()]);
 }

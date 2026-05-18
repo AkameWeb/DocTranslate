@@ -7,7 +7,7 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 require_once 'vendor/autoload.php';
-require_once 'config/db.php';
+require_once 'config/database.php';  // ← ИСПРАВЛЕНО: db.php -> database.php
 require_once 'google-config.php';
 
 use League\OAuth2\Client\Provider\Google;
@@ -92,3 +92,4 @@ try {
 } catch (Exception $e) {
     die('Ошибка получения данных от Google: ' . $e->getMessage());
 }
+// ← УДАЛЁН лишний открывающий <?php

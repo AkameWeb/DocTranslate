@@ -91,6 +91,15 @@
             'aliases' => array(),
             'dev_requirement' => false,
         ),
+        'intervention/image' => array(
+            'pretty_version' => '2.7.2',
+            'version' => '2.7.2.0',
+            'reference' => '04be355f8d6734c826045d02a1079ad658322dad',
+            'type' => 'library',
+            'install_path' => __DIR__ . '/../intervention/image',
+            'aliases' => array(),
+            'dev_requirement' => false,
+        ),
         'league/oauth2-client' => array(
             'pretty_version' => '2.9.0',
             'version' => '2.9.0.0',

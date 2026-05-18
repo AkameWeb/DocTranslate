@@ -138,6 +138,10 @@ class ComposerStaticInit33005827836b7dc632dafd013dfbf380
         array (
             'League\\OAuth2\\Client\\' => 21,
         ),
+        'I' =>
+        array (
+            'Intervention\\Image\\' => 19,
+        ),
         'G' =>
         array (
             'GuzzleHttp\\Psr7\\' => 16,
@@ -220,6 +224,10 @@ class ComposerStaticInit33005827836b7dc632dafd013dfbf380
         array (
             0 => __DIR__ . '/..' . '/league/oauth2-google/src',
             1 => __DIR__ . '/..' . '/league/oauth2-client/src',
+        ),
+        'Intervention\\Image\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/intervention/image/src/Intervention/Image',
         ),
         'GuzzleHttp\\Psr7\\' =>
         array (
